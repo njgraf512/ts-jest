@@ -83,15 +83,12 @@ const BABELRC_FILENAME = '.babelrc';
 const BABELRC_JS_FILENAME = '.babelrc.js';
 const BABEL_CONFIG_KEY = 'babel';
 const PACKAGE_JSON = 'package.json';
-const cache: { [directory: string]: object } = Object.create(null);
+const cache: { [directory: string]: string } = Object.create(null);
 
 /**
  * Adapted from the function Jest uses to get babel config
  */
-function getBabelRC(
-  filename: string,
-  useBabelrc: boolean,
-): BabelTransformOptions {
+function getBabelRC(filename: string, useBabelrc: boolean): string {
   const paths = [];
   let directory = filename;
   // tslint:disable-next-line:no-conditional-assignment
@@ -104,12 +101,12 @@ function getBabelRC(
     if (useBabelrc) {
       const configFilePath = path.join(directory, BABELRC_FILENAME);
       if (fs.existsSync(configFilePath)) {
-        cache[directory] = JSON.parse(fs.readFileSync(configFilePath, 'utf8'));
+        cache[directory] = fs.readFileSync(configFilePath, 'utf8');
         break;
       }
       const configJsFilePath = path.join(directory, BABELRC_JS_FILENAME);
       if (fs.existsSync(configJsFilePath)) {
-        cache[directory] = require(configJsFilePath);
+        cache[directory] = JSON.stringify(require(configJsFilePath));
         break;
       }
     } else {
@@ -121,14 +118,16 @@ function getBabelRC(
       if (fs.existsSync(packageJsonFilePath)) {
         const packageJsonFileContents = require(packageJsonFilePath);
         if (packageJsonFileContents[BABEL_CONFIG_KEY]) {
-          cache[directory] = packageJsonFileContents[BABEL_CONFIG_KEY];
+          cache[directory] = JSON.stringify(
+            packageJsonFileContents[BABEL_CONFIG_KEY],
+          );
           break;
         }
       }
     }
   }
   paths.forEach(directoryPath => (cache[directoryPath] = cache[directory]));
-  return cache[directory] || {};
+  return cache[directory] || '';
 }
 
 /**
@@ -145,14 +144,13 @@ export function getCacheKey(
   const tsConfig = getTSConfig(jestConfig.globals, jestConfig.rootDir);
 
   const tsJestConfig = getTSJestConfig(jestConfig.globals);
-  let babelConfig: BabelTransformOptions = {};
+  let babelConfig: string = '';
   if (!tsJestConfig.skipBabel) {
     babelConfig = getBabelRC(filePath, !!tsJestConfig.useBabelrc);
     if (tsJestConfig.babelConfig) {
-      babelConfig = { ...babelConfig, ...tsJestConfig.babelConfig };
+      babelConfig += JSON.stringify(tsJestConfig.babelConfig);
     }
   }
-
   return crypto
     .createHash('md5')
     .update(JSON.stringify(tsConfig), 'utf8')

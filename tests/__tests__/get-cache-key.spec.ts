@@ -1,9 +1,11 @@
 import { getCacheKey } from '../../src/preprocessor';
 import { TransformOptions } from '../../src/jest-types';
+import * as fs from 'fs';
 
 describe('getCacheKey', () => {
+  const filepath = __filename;
   const src = 'console.log(123);';
-  const filepath = '/tmp/filepath';
+  // const filepath = '/tmp/filepath';
   const configStr = `{
     "globals": {
       "__TS_CONFIG": {
@@ -11,6 +13,10 @@ describe('getCacheKey', () => {
           "target": "ES5",
           "module": "commonjs"
         }
+      },
+      "ts-jest": {
+        "useBabelrc": true,
+        "skipBabel": false
       }
     },
     "transform": {

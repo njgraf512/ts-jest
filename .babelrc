@@ -1,0 +1,60 @@
+{
+  // es2015 preset with `modules: false` transpiles to ES6 -> ES5, but sends ES6
+  // modules to Webpack so that UglifyJS can do tree-shaking via static analysis.
+  "presets": [
+    [
+      "es2015",
+      {
+        "modules": false
+      }
+    ],
+    "es2016",
+    "es2017",
+    "react",
+    "stage-2"
+  ],
+  // Allow babel to send comments to Webpack so that "magic" dynamic import directives can be interpreted (later stripped by UglifyJS)
+  "comments": true,
+  "plugins": [
+    "syntax-dynamic-import",
+    "transform-decorators-legacy",
+    "transform-async-functions",
+    [
+      "transform-builtin-extend",
+      {
+        "globals": [
+          "Error"
+        ],
+        "approximate": true
+      }
+    ]
+  ],
+  "env": {
+    "jest03-07-04-18-1": {
+      // do not re-use this key; you must change it whenever changing the config below until this bug is fixed:
+      // https://github.com/facebook/jest/issues/3772
+      "presets": [
+        "es2015",
+        "es2016",
+        "es2017",
+        "react",
+        "stage-2"
+      ],
+      "plugins": [
+        // Dynamic import support in Jest (see: https://jestjs.io/docs/en/webpack.html#using-with-webpack-2)
+        "dynamic-import-node",
+        "transform-decorators-legacy",
+        "transform-async-functions",
+        [
+          "transform-builtin-extend",
+          {
+            "globals": [
+              "Error"
+            ],
+            "approximate": true
+          }
+        ]
+      ]
+    }
+  }
+}
