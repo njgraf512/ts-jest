@@ -1,4 +1,6 @@
 import * as crypto from 'crypto';
+import * as fs from 'fs';
+import * as path from 'path';
 import {
   BabelTransformOptions,
   CodeSourceMapPair,
@@ -77,6 +79,58 @@ export function process(
   return { code: outputText.code, map: outputText.map };
 }
 
+const BABELRC_FILENAME = '.babelrc';
+const BABELRC_JS_FILENAME = '.babelrc.js';
+const BABEL_CONFIG_KEY = 'babel';
+const PACKAGE_JSON = 'package.json';
+const cache: { [directory: string]: object } = Object.create(null);
+
+/**
+ * Adapted from the function Jest uses to get babel config
+ */
+function getBabelRC(
+  filename: string,
+  useBabelrc: boolean,
+): BabelTransformOptions {
+  const paths = [];
+  let directory = filename;
+  // tslint:disable-next-line:no-conditional-assignment
+  while (directory !== (directory = path.dirname(directory))) {
+    if (cache[directory]) {
+      break;
+    }
+
+    paths.push(directory);
+    if (useBabelrc) {
+      const configFilePath = path.join(directory, BABELRC_FILENAME);
+      if (fs.existsSync(configFilePath)) {
+        cache[directory] = JSON.parse(fs.readFileSync(configFilePath, 'utf8'));
+        break;
+      }
+      const configJsFilePath = path.join(directory, BABELRC_JS_FILENAME);
+      if (fs.existsSync(configJsFilePath)) {
+        cache[directory] = require(configJsFilePath);
+        break;
+      }
+    } else {
+      const resolvedJsonFilePath = path.join(directory, PACKAGE_JSON);
+      const packageJsonFilePath =
+        resolvedJsonFilePath === PACKAGE_JSON
+          ? path.resolve(directory, PACKAGE_JSON)
+          : resolvedJsonFilePath;
+      if (fs.existsSync(packageJsonFilePath)) {
+        const packageJsonFileContents = require(packageJsonFilePath);
+        if (packageJsonFileContents[BABEL_CONFIG_KEY]) {
+          cache[directory] = packageJsonFileContents[BABEL_CONFIG_KEY];
+          break;
+        }
+      }
+    }
+  }
+  paths.forEach(directoryPath => (cache[directoryPath] = cache[directory]));
+  return cache[directory] || {};
+}
+
 /**
  * This is the function Jest uses to check if it has the file already in cache
  */
@@ -90,10 +144,20 @@ export function getCacheKey(
 
   const tsConfig = getTSConfig(jestConfig.globals, jestConfig.rootDir);
 
+  const tsJestConfig = getTSJestConfig(jestConfig.globals);
+  let babelConfig: BabelTransformOptions = {};
+  if (!tsJestConfig.skipBabel) {
+    babelConfig = getBabelRC(filePath, !!tsJestConfig.useBabelrc);
+    if (tsJestConfig.babelConfig) {
+      babelConfig = { ...babelConfig, ...tsJestConfig.babelConfig };
+    }
+  }
+
   return crypto
     .createHash('md5')
     .update(JSON.stringify(tsConfig), 'utf8')
     .update(JSON.stringify(transformOptions), 'utf8')
+    .update(JSON.stringify(babelConfig), 'utf8')
     .update(fileData + filePath + jestConfigStr, 'utf8')
     .digest('hex');
 }
